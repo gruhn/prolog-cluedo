@@ -220,9 +220,9 @@ suggest_card(Card) :-
     hand(Player, Card).
 
 % Generate options for the next move. If envelope is determined
-% always recommend accusation first.
+% always and only recommend accusation.
 next_move(accusation(Suspect, Weapon, Room)) :-
-    envelope(Suspect, Weapon, Room).
+    envelope(Suspect, Weapon, Room), !.
 % Otherwise generate suggestions with focus on rooms. Rooms are
 % the hardest to deduce. There are more rooms than suspects
 % and weapons and you can only suggest a room if you manage to
