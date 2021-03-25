@@ -1,9 +1,14 @@
 version: "3"
 
+# development workflow:
+#  - start repl `docker-compose run swipl`
+#  - rebuild sources `abolish_all_tables, make.`
+#  - exit repl `halt.`
+
 services:
     swipl:
         image: swipl
-        working_dir: /app
+        working_dir: /src
         volumes:
-            - ./:/app
+            - ./src:/src
         command: swipl cluedo.pl

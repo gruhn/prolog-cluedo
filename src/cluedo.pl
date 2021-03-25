@@ -6,16 +6,14 @@
 % 	-> if suspect is send to room (special game rule), suggest suspect to prevent him from making
 %		suggestions in the room he really wants
 
-:- dynamic number_of_players/1.
-:- dynamic i_am_player/1.
-:- dynamic starting_player/1.
-:- dynamic my_cards/1.
-:- dynamic turns/3.
-:- dynamic suspect/1.
-:- dynamic room/1.
-:- dynamic weapon/1.
-
-?- use_module(library(clpfd)).
+% :- dynamic number_of_players/1.
+% :- dynamic i_am_player/1.
+% :- dynamic starting_player/1.
+% :- dynamic my_cards/1.
+% :- dynamic turns/3.
+% :- dynamic suspect/1.
+% :- dynamic room/1.
+% :- dynamic weapon/1.
 
 card(Card):- suspect(Card).
 card(Card):- weapon(Card).
@@ -63,8 +61,8 @@ turn(Player, Turn) :-
 	number_of_players(NumberOfPlayers),
     starting_player(SP),
     turns(Turns),
-	mod(Index - Player + SP, NumberOfPlayers) #= 0,
-    nth0(Index, Turns, Turn).
+    nth0(Index, Turns, Turn),
+	mod(Index - Player + SP, NumberOfPlayers) =:= 0.
 
 
 % Players are arranged in a cyclic order with respect to clockwise turn order.
@@ -74,9 +72,9 @@ turn(Player, Turn) :-
 %  true:  player1 < player3 < player5
 %  true:  player5 < player1 < player2
 %  false: player1 < player3 < player2
-cyclic_order(A, B, C) :- A #< B, B #< C.
-cyclic_order(A, B, C) :- B #< C, C #< A.
-cyclic_order(A, B, C) :- C #< A, A #< B.
+cyclic_order(A, B, C) :- A < B, B < C.
+cyclic_order(A, B, C) :- B < C, C < A.
+cyclic_order(A, B, C) :- C < A, A < B.
 
 sits_between(PlayerA, PlayerB, PlayerC) :-
     player(PlayerA),
@@ -210,6 +208,8 @@ card_determined(Card) :-
     card_type(EnvCard, Type),
     envelope(EnvCard).
 
+% TODO: suggest cards first that are "more" determined? E.g. two players already
+% excluded, one missing.
 suggest_card(Card) :-
     card(Card),
     not(card_determined(Card)).
@@ -235,15 +235,18 @@ next_move(accusation(Suspect, Weapon, Room)) :-
 % thereby know all the cards in his hand we also can exclude that he has any
 % of the remaining rooms.
 next_move(suggestion(Suspect, Weapon, Room)) :-
-    suspect(Suspect),
-    weapon(Weapon),
-   	room(Room), % room last!
+    % suspect_card rules first so attractive suggestions are generated first and
+    % only later validated to actually be suspect, weapon, room triples.
    	suggest_card(Suspect),
     suggest_card(Weapon),
-    suggest_card(Room).
+    suggest_card(Room),
+    suspect(Suspect),
+    weapon(Weapon),
+   	room(Room). % room last!
 
 
 % sample game:
+/*
 suspect("Mustard").
 suspect("Scarlett").
 suspect("Peacock").
@@ -311,4 +314,61 @@ turns(
     , ( suggestion("Scarlett", "Rope", "Kitchen"), disproof )
     % winning accusation: ("Scarlett", "Kitchen", "Wrench")
 	]
+).
+*/
+
+suspect("Mustard").
+suspect("Scarlett").
+suspect("Peacock").
+suspect("Plum").
+suspect("Orchid").
+suspect("Green").
+
+room("Ballroom").
+room("Billiard Room").
+room("Conservatory").
+room("Dining Room").
+room("Hall").
+room("Kitchen").
+room("Library").
+room("Lounge").
+room("Study").
+
+weapon("Candlestick").
+weapon("Dagger").
+weapon("Lead Pipe").
+weapon("Revolver").
+weapon("Rope").
+weapon("Wrench").
+
+number_of_players(4).
+starting_player(0).
+i_am_player(0).
+my_cards(["Orchid", "Dagger", "Rope", "Ballroom", "Library"]).
+turns(
+    [ ( suggestion("Mustard", "Candlestick", "Billiard Room"), disproof(3, "Mustard") )
+    , ( suggestion("Plum", "Revolver", "Ballroom"), disproof(3) )
+    , ( suggestion("Plum", "Rope", "Dining Room"), disproof(3) )
+    , ( nothing )
+
+    , ( suggestion("Scarlett", "Candlestick", "Dining Room"), disproof(1, "Dining Room") )
+    , ( suggestion("Scarlett", "Wrench", "Kitchen"), disproof(2) )
+    , ( suggestion("Orchid", "Rope", "Study"), disproof(0, "Rope") )
+    , ( suggestion("Orchid", "Candlestick", "Study"), disproof(0, "Orchid") )
+
+    , ( suggestion("Scarlett", "Candlestick", "Hall"), disproof(1, "Hall") )
+    , ( suggestion("Scarlett", "Wrench", "Ballroom"), disproof(2) )
+    , ( suggestion("Green", "Revolver", "Ballroom"), disproof(3) )
+    , ( suggestion("Green", "Revolver", "Library"), disproof(0, "Library") )
+
+    , ( suggestion("Scarlett", "Candlestick", "Study"), disproof(2, "Study") )
+    , ( nothing )
+    , ( suggestion("Green", "Lead Pipe", "Library"), disproof(3) )
+    , ( suggestion("Peacock", "Candlestick", "Conservatory"), disproof(1) )
+
+    , ( suggestion("Scarlett", "Candlestick", "Kitchen"), disproof(2, "Kitchen") )
+    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(0, "Ballroom") )
+    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(0, "Ballroom") )
+    , ( suggestion("Scarlett", "Lead Pipe", "Billiard Room", disproof ) )
+    ]
 ).
