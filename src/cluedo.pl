@@ -195,6 +195,7 @@ envelope(Suspect, Weapon, Room) :-
     envelope(Weapon),
     envelope(Room).
 
+
 % If we know that a card is in a players hand we consider it determined.
 card_determined(Card) :-
    	card(Card),
@@ -208,11 +209,22 @@ card_determined(Card) :-
     card_type(EnvCard, Type),
     envelope(EnvCard).
 
-% TODO: suggest cards first that are "more" determined? E.g. two players already
-% excluded, one missing.
+
+% suggest cards first that are "more" determined? E.g. when all players but one
+% are already excluded.
 suggest_card(Card) :-
+    number_of_players(NumberOfPlayers),
+    Max is NumberOfPlayers - 1,
+    between(1, Max, PlayerIncludeCount),
     card(Card),
-    not(card_determined(Card)).
+    not(card_determined(Card)),
+    findall(Player, hand_include(Player, Card), Players),
+    length(Players, PlayerIncludeCount).
+% Say we know the murder weapon is the "Dagger" but we don't know who has the
+% "Wrench". We have to keep making suggestions to figure out suspect and room.
+% But we want to avoid including "Wrench" in our suggestions because if we are
+% shown that card we wasted a suggestions. Thus we deliberatly use the solution
+% card ("Dagger") or cards in our hand.
 suggest_card(Card) :-
     envelope(Card).
 suggest_card(Card) :-
@@ -246,7 +258,6 @@ next_move(suggestion(Suspect, Weapon, Room)) :-
 
 
 % sample game:
-/*
 suspect("Mustard").
 suspect("Scarlett").
 suspect("Peacock").
@@ -254,14 +265,14 @@ suspect("Plum").
 suspect("Orchid").
 suspect("Green").
 
-room("Kitchen").
 room("Ballroom").
+room("Billiard Room").
 room("Conservatory").
 room("Dining Room").
-room("Billiard Room").
+room("Hall").
+room("Kitchen").
 room("Library").
 room("Lounge").
-room("Hall").
 room("Study").
 
 weapon("Candlestick").
@@ -272,103 +283,36 @@ weapon("Rope").
 weapon("Wrench").
 
 number_of_players(4).
-starting_player(0).
+starting_player(3).
 i_am_player(0).
-my_cards(["Hall", "Library", "Lounge", "Study", "Rope"]).
+my_cards(["Orchid", "Dagger", "Wrench", "Dining Room", "Library"]).
 turns(
-	[ ( suggestion("Mustard", "Candlestick", "Kitchen"), disproof(1, "Mustard") )
-    , ( suggestion("Green", "Wrench", "Kitchen"), disproof(2) )
-    , ( suggestion("Scarlett", "Rope", "Kitchen"), disproof(0, "Rope") )
-    , ( suggestion("Scarlett", "Wrench", "Library"), disproof(0, "Library") )
+    [ ( suggestion("Green", "Dagger", "Library"), disproof(0, "Dagger") )
+    , ( suggestion("Mustard", "Candlestick", "Ballroom"), disproof(1, "Mustard") )
+    , ( suggestion("Orchid", "Revolver", "Kitchen"), disproof(0, "Orchid") )
+    , ( suggestion("Orchid", "Wrench", "Study"), disproof(3) )
 
-    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(2, "Ballroom") )
-    , ( suggestion("Plum", "Dagger", "Study"), disproof(3) )
-    , ( suggestion("Scarlett", "Revolver", "Billiard Room"), disproof(1) )
-    , ( nothing )
-
-    , ( suggestion("Scarlett", "Candlestick", "Kitchen"), disproof(2, "Candlestick") )
-    , ( suggestion("Orchid", "Wrench", "Hall"), disproof(3) )
-    , ( suggestion("Green", "Dagger", "Kitchen"), disproof(3) )
-    , ( suggestion("Plum", "Candlestick", "Study"), disproof(0, "Study") )
-
-    , ( suggestion("Scarlett", "Dagger", "Library"), disproof(3, "Dagger") )
-    , ( suggestion("Peacock", "Wrench", "Library"), disproof(2) )
-    , ( suggestion("Mustard", "Wrench", "Library"), disproof(0, "Library") )
-    , ( suggestion("Mustard", "Revolver", "Lounge"), disproof(0, "Lounge") )
-
-    , ( suggestion("Scarlett", "Lead Pipe", "Billiard Room"), disproof(1, "Lead Pipe") )
-    , ( suggestion("Scarlett", "Rope", "Hall"), disproof(0, "Rope") )
-    , ( suggestion("Plum", "Wrench", "Hall"), disproof(3) )
-    , ( suggestion("Plum", "Revolver", "Dining Room"), disproof(1) )
-
+    , ( suggestion("Orchid", "Wrench", "Hall"), disproof(0, "Wrench") )
     , ( suggestion("Scarlett", "Revolver", "Kitchen"), disproof(1, "Revolver") )
-    , ( nothing )
-    , ( suggestion("Mustard", "Wrench", "Lounge"), disproof(0, "Lounge") )
-    , ( suggestion("Mustard", "Candlestick", "Ballroom"), disproof(1) )
+    , ( suggestion("Green", "Lead Pipe", "Ballroom"), disproof(2) )
+    , ( suggestion("Orchid", "Revolver", "Kitchen"), disproof(0, "Orchid") )
 
-    , ( suggestion("Scarlett", "Rope", "Dining Room"), disproof(1, "Dining Room") )
-    , ( suggestion("Scarlett", "Candlestick", "Kitchen"), disproof(2) )
-    , ( suggestion("Orchid", "Lead Pipe", "Kitchen"), disproof(3) )
-    , ( suggestion("Peacock", "Revolver", "Kitchen"), disproof(1) )
+    , ( suggestion("Orchid", "Revolver", "Dining Room"), disproof(0, "Dining Room") )
+    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(1, "Scarlett") )
+    , ( suggestion("Orchid", "Rope", "Library"), disproof(2) )
+    , ( suggestion("Orchid", "Wrench", "Kitchen"), disproof(0, "Wrench") )
 
-    , ( suggestion("Scarlett", "Rope", "Kitchen"), disproof )
-    % winning accusation: ("Scarlett", "Kitchen", "Wrench")
-	]
-).
-*/
+    , ( suggestion("Orchid", "Rope", "Billiard Room"), disproof(0, "Orchid") )
+    , ( suggestion("Scarlett", "Candlestick", "Kitchen"), disproof(1, "Candlestick") )
+    , ( suggestion("Plum", "Wrench", "Lounge"), disproof(3) )
+    , ( suggestion("Orchid", "Revolver", "Lounge"), disproof(3) )
 
-suspect("Mustard").
-suspect("Scarlett").
-suspect("Peacock").
-suspect("Plum").
-suspect("Orchid").
-suspect("Green").
+    , ( suggestion("Orchid", "Rope", "Ballroom"), disproof(0, "Orchid") )
+    , ( suggestion("Plum", "Lead Pipe", "Kitchen"), disproof(3, "Plum") )
+    , ( suggestion("Peacock", "Wrench", "Conservatory"), disproof(2) )
+    , ( suggestion("Plum", "Revolver", "Dining Room"), disproof(3) )
 
-room("Ballroom").
-room("Billiard Room").
-room("Conservatory").
-room("Dining Room").
-room("Hall").
-room("Kitchen").
-room("Library").
-room("Lounge").
-room("Study").
-
-weapon("Candlestick").
-weapon("Dagger").
-weapon("Lead Pipe").
-weapon("Revolver").
-weapon("Rope").
-weapon("Wrench").
-
-number_of_players(4).
-starting_player(0).
-i_am_player(0).
-my_cards(["Orchid", "Dagger", "Rope", "Ballroom", "Library"]).
-turns(
-    [ ( suggestion("Mustard", "Candlestick", "Billiard Room"), disproof(3, "Mustard") )
-    , ( suggestion("Plum", "Revolver", "Ballroom"), disproof(3) )
-    , ( suggestion("Plum", "Rope", "Dining Room"), disproof(3) )
-    , ( nothing )
-
-    , ( suggestion("Scarlett", "Candlestick", "Dining Room"), disproof(1, "Dining Room") )
-    , ( suggestion("Scarlett", "Wrench", "Kitchen"), disproof(2) )
-    , ( suggestion("Orchid", "Rope", "Study"), disproof(0, "Rope") )
-    , ( suggestion("Orchid", "Candlestick", "Study"), disproof(0, "Orchid") )
-
-    , ( suggestion("Scarlett", "Candlestick", "Hall"), disproof(1, "Hall") )
-    , ( suggestion("Scarlett", "Wrench", "Ballroom"), disproof(2) )
-    , ( suggestion("Green", "Revolver", "Ballroom"), disproof(3) )
-    , ( suggestion("Green", "Revolver", "Library"), disproof(0, "Library") )
-
-    , ( suggestion("Scarlett", "Candlestick", "Study"), disproof(2, "Study") )
-    , ( nothing )
-    , ( suggestion("Green", "Lead Pipe", "Library"), disproof(3) )
-    , ( suggestion("Peacock", "Candlestick", "Conservatory"), disproof(1) )
-
-    , ( suggestion("Scarlett", "Candlestick", "Kitchen"), disproof(2, "Kitchen") )
-    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(0, "Ballroom") )
-    , ( suggestion("Scarlett", "Candlestick", "Ballroom"), disproof(0, "Ballroom") )
-    , ( suggestion("Scarlett", "Lead Pipe", "Billiard Room", disproof ) )
+    , ( suggestion("Orchid", "Revolver", "Billiard Room"), disproof(0, "Orchid") )
+    % , ( suggestion("Peacock", "Lead Pipe", "Kitchen"), disproof )
     ]
 ).
