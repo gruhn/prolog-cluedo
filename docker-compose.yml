@@ -6,9 +6,11 @@ version: "3"
 #  - exit repl `halt.`
 
 services:
-    swipl:
-        image: swipl
-        working_dir: /src
-        volumes:
-            - ./src:/src
-        command: swipl cluedo.pl
+  swipl:
+    image: swipl
+    working_dir: /src
+    ports:
+      - 8080:80
+    volumes:
+      - ./:/src
+    command: swipl server.pl
