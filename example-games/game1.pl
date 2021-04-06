@@ -1,8 +1,8 @@
 :- use_module(cluedo).
 
-?- cluedo:assertz(number_of_players(4)).
-?- cluedo:assertz(starting_player(3)).
-?- cluedo:assertz(my_cards(["Orchid", "Dagger", "Wrench", "Dining Room", "Library"])).
+?- cluedo:assertz(player_count(4)).
+?- cluedo:assertz(player_first(3)).
+?- cluedo:assertz(own_cards(["Orchid", "Dagger", "Wrench", "Dining Room", "Library"])).
 
 ?- cluedo:assertz(turns(
   [ ( suggestion("Green", "Dagger", "Library"), disproof(0, "Dagger") )

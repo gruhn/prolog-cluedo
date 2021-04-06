@@ -13,4 +13,4 @@ services:
       - 8080:80
     volumes:
       - ./:/src
-    command: swipl ./example-games/game2.pl
+    command: swipl ./example-games/game3.pl
