@@ -105,112 +105,128 @@ sits_between(PlayerA, PlayerB, PlayerC) :-
   player(PlayerC),
   cyclic_order(PlayerA, PlayerB, PlayerC).
 
-:- table hand/2, hand_exclude/2.
+:- table hand/3, hand_exclude/3.
 
-hand(Player, Card) :-
-  i_am_player(Player),
+hand(View, View, Card) :-
+  i_am_player(View),
   own_cards(Cards),
   member(Card, Cards).
 % If a player disproves a suggestion, we know that he has at least one of the
 % cards named in the suggestion. If we also know that he doesn't have two
 % of the cards he must posess the remaining card.
-hand(Player, Card) :-
+hand(View, Player, Card) :-
+  player(View),
   player(Player),
 	turn(_, (suggestion(Suspect, Weapon, Room), disproof(Player))),
   select(Card, [Suspect, Weapon, Room], [Card2, Card3]),
-	hand_exclude(Player, Card2),
-  hand_exclude(Player, Card3).
+	hand_exclude(View, Player, Card2),
+  hand_exclude(View, Player, Card3).
 % A player has a card if he uses it to disprove my suggestion.
-hand(Player, Card) :-
+hand(View, Player, Card) :-
+  player(View),
   player(Player),
-  turn(_, (_, disproof(Player, Card))).
+  turn(View, (_, disproof(Player, Card))).
+% Say a player has 4 cards and we have excluded all but 4 cards we know the
+% player has exactly those cards.
+hand(View, Player, Card) :-
+  player(View),
+  player_card_count(Player, PlayerCardCount),
+  length(HandCards, PlayerCardCount),
+  all_cards(AllCards),
+  partition(hand_exclude(View, Player), AllCards, _, HandCards),
+  member(Card, HandCards).
+
 
 % If PlayerA made a suggestion which was disproved by PlayerC,
 % then any PlayerB sitting between the two was not able to
 % dispove the suggestion and can therefore not possess any of the named cards
-hand_exclude_all(PlayerB, [Suspect, Weapon, Room]) :-
+hand_exclude_all(_, PlayerB, [Suspect, Weapon, Room]) :-
 	player(PlayerB),
   turn(PlayerA, (suggestion(Suspect, Weapon, Room), disproof(PlayerC))),
   sits_between(PlayerA, PlayerB, PlayerC).
-hand_exclude_all(PlayerB, [Suspect, Weapon, Room]) :-
+hand_exclude_all(_, PlayerB, [Suspect, Weapon, Room]) :-
 	player(PlayerB),
   turn(PlayerA, (suggestion(Suspect, Weapon, Room), disproof(PlayerC, _))),
   sits_between(PlayerA, PlayerB, PlayerC).
 % If Player made a suggestion that nobody could disproof then
 % every OtherPlayer does not have any of the named cards.
-hand_exclude_all(OtherPlayer, [Suspect, Weapon, Room]) :-
+hand_exclude_all(_, OtherPlayer, [Suspect, Weapon, Room]) :-
 	player(OtherPlayer),
   turn(Player, (suggestion(Suspect, Weapon, Room), disproof)),
   Player \= OtherPlayer.
 % If a Player makes a final accusation he certainly has non of the named cards
-hand_exclude_all(Player, [Suspect, Weapon, Room]) :-
+hand_exclude_all(_, Player, [Suspect, Weapon, Room]) :-
   turn(Player, (_, _, accusation(Suspect, Weapon, Room))).
 % If we know all of a players cards all other cards can be excluded. Implies
 % that all cards not in MY hand are automatically excluded.
-hand_exclude_all(Player, OtherCards) :-
+hand_exclude_all(View, Player, OtherCards) :-
+  player(View),
   player_card_count(Player, PlayerCardCount),
   length(HandCards, PlayerCardCount),
   all_cards(AllCards),
-  partition(hand(Player), AllCards, HandCards, OtherCards).
-
-% Players want to learn something about cards they don't have by making
-% suggestions. Thus, we assume that at least one of the cards named
-% is a suggestion is not in his hand. NOTE: If a player does it anyway, this
-% introduces contradictions into the knowlage base.
-hand_exclude_some(Player, [Suspect, Weapon, Room]) :-
-	turn(Player, (suggestion(Suspect, Weapon, Room), _)).
-
-% A card is not in a players hand if it's already in another players hand.
-hand_exclude(PlayerA, Card) :-
-  player(PlayerA),
-  player(PlayerB),
-	hand(PlayerB, Card),
-	PlayerA \= PlayerB.
-hand_exclude(Player, Card) :-
-  player(Player),
-  hand_exclude_all(Player, CardList),
-  member(Card, CardList).
-hand_exclude(Player, Card) :-
-  player(Player),
-  hand_exclude_some(Player, CardList),
-	select(Card, CardList, [Card2, Card3]),
-  % TOOD: is it necessary to know that the other cards are in his hand?
-  % NO! If we know the player does not have the cards himself but we know
-  % he has already seen them, he is probably interested in other cards
-	hand(Player, Card2),
-  hand(Player, Card3).
+  partition(hand(View, Player), AllCards, HandCards, OtherCards).
 
 
-hand_include(Player, Card) :-
+% If we know that a card is in a players hand we consider it determined.
+card_determined(View, Card) :-
+  player(View),
   card(Card),
   player(Player),
-  not(hand_exclude(Player, Card)).
+  hand(View, Player, Card).
+% If we know, say the murder weapon, all other weapons are determined.
+% We may not know who has which weapon but we don't care about that
+% information anymore.
+card_determined(View, Card) :-
+  card_type(Card, Type),
+  card_type(EnvCard, Type),
+  envelope(View, EnvCard).
 
-n_subset(0, [], []).
-n_subset(N, Xs, [_|Ys]) :-
-  n_subset(N, Xs, Ys).
-n_subset(N, [X|Xs], [X|Ys]) :-
-  NN is N - 1,
-  n_subset(NN, Xs, Ys).
 
-full_hand_candidate(Player, Cards) :-
-  findall(Card, hand_include(Player, Card), AllCandidates),
-  partition(hand(Player), AllCandidates, KnownCards, PossibleCards),
-  player_card_count(Player, CardCount),
-  length(KnownCards, KnownCount),
-  RemainingCount is CardCount - KnownCount,
-  n_subset(RemainingCount, RemainingCards, PossibleCards),
-  append(KnownCards, RemainingCards, Cards).
+% A card is not in a players hand if it's already in another players hand.
+hand_exclude(View, PlayerA, Card) :-
+  player(View),
+  player(PlayerA),
+  player(PlayerB),
+	hand(View, PlayerB, Card),
+	PlayerA \= PlayerB.
+hand_exclude(View, Player, Card) :-
+  player(View),
+  player(Player),
+  hand_exclude_all(View, Player, CardList),
+  member(Card, CardList).
+% Players want to learn something about cards they don't have by making
+% suggestions. Thus, we assume that at least one of the cards named
+% is a suggestion is not in his hand. If we also know that the player has
+% determined two of the cards, we deduce the remaining card is not in his hand.
+hand_exclude(View, Player, Card) :-
+  player(View),
+  player(Player),
+  hand_exclude_some(View, Player, CardList),
+	select(Card, CardList, [Card2, Card3]),
+  % NOTE: we assume opponents use the same reasoning as we do. If the player
+  % uses weaker reasoning we might make wrong deductions.
+  card_determined(Player, Card2),
+  card_determined(Player, Card3).
 
-envelope(Card) :-
+
+hand_include(View, Player, Card) :-
+  card(Card),
+  player(Player),
+  not(hand_exclude(View, Player, Card)).
+
+
+envelope(View, Card) :-
+  player(View),
 	card(Card),
-  forall(player(Player), hand_exclude(Player, Card)).
-envelope(Card) :-
+  forall(player(Player), hand_exclude(View, Player, Card)).
+envelope(View, Card) :-
+  player(View),
   all_cards(All, _),
   select(Card, All, AllExceptOne),
-  forall(member(C, AllExceptOne), hand(_, C)).
+  forall(member(C, AllExceptOne), hand(View, _, C)).
 
-envelope(Suspect, Weapon, Room) :-
+envelope(View, Suspect, Weapon, Room) :-
+  player(View),
   suspect(Suspect),
   weapon(Weapon),
   room(Room),
@@ -219,29 +235,16 @@ envelope(Suspect, Weapon, Room) :-
   envelope(Room).
 
 
-% If we know that a card is in a players hand we consider it determined.
-card_determined(Card) :-
-  card(Card),
-  player(Player),
-  hand(Player, Card).
-% If we know, say the murder weapon, all other weapons are determined.
-% We may not know who has which weapon but we don't care about that
-% information anymore.
-card_determined(Card) :-
-  card_type(Card, Type),
-  card_type(EnvCard, Type),
-  envelope(EnvCard).
-
-
-% suggest cards first that are "more" determined? E.g. when all players but one
+% suggest cards first that are "more" determined. E.g. when all players but one
 % are already excluded.
 suggest_card(Card) :-
+  i_am_player(View),
   player_count(NumberOfPlayers),
   Max is NumberOfPlayers - 1,
   between(1, Max, PlayerIncludeCount),
   card(Card),
-  not(card_determined(Card)),
-  findall(Player, hand_include(Player, Card), Players),
+  not(card_determined(View, Card)),
+  findall(Player, hand_include(View, Player, Card), Players),
   length(Players, PlayerIncludeCount).
 % Say we know the murder weapon is the "Dagger" but we don't know who has the
 % "Wrench". We have to keep making suggestions to figure out suspect and room.
@@ -249,10 +252,11 @@ suggest_card(Card) :-
 % shown that card we wasted a suggestions. Thus we deliberatly use the solution
 % card ("Dagger") or cards in our hand.
 suggest_card(Card) :-
-  envelope(Card).
+  i_am_player(View),
+  envelope(View, Card).
 suggest_card(Card) :-
-  i_am_player(Player),
-  hand(Player, Card).
+  i_am_player(View),
+  hand(View, View, Card).
 
 % Generate options for the next move. If envelope is determined
 % always and only recommend accusation.
