@@ -142,7 +142,7 @@
             // populate the actual Module object.
             var Module = {
                 noInitialRun: true,
-                locateFile: url => `dist/${url}`,
+                locateFile: url => `swipl-wasm/${url}`,
                 print: print,
                 printErr: printErr,
                 preRun: [() => FS.init(readStdin)], // sets up stdin
@@ -155,6 +155,6 @@
                 }
             };
         </script>
-        <script src="dist/swipl-web.js"></script>
+        <script src="swipl-wasm/swipl-web.js"></script>
     </body>
 </html>

@@ -1,10 +1,5 @@
 version: "3"
 
-# development workflow:
-#  - start repl `docker-compose run swipl`
-#  - rebuild sources `abolish_all_tables, make.`
-#  - exit repl `halt.`
-
 services:
   swipl:
     image: swipl
@@ -13,4 +8,4 @@ services:
       - 8080:80
     volumes:
       - ./:/src
-    command: swipl ./example-games/game3.pl
+    command: swipl ./cluedo.pl
