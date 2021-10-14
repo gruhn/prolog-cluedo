@@ -14,47 +14,32 @@
 
 i_am_player(0).
 
-suspect("Mustard").
-suspect("Scarlett").
-suspect("Peacock").
-suspect("Plum").
-suspect("Orchid").
-suspect("Green").
+card(suspect, "Mustard").
+card(suspect, "Scarlett").
+card(suspect, "Peacock").
+card(suspect, "Plum").
+card(suspect, "Orchid").
+card(suspect, "Green").
 
-room("Ballroom").
-room("Billiard Room").
-room("Conservatory").
-room("Dining Room").
-room("Hall").
-room("Kitchen").
-room("Library").
-room("Lounge").
-room("Study").
+card(room, "Ballroom").
+card(room, "Billiard Room").
+card(room, "Conservatory").
+card(room, "Dining Room").
+card(room, "Hall").
+card(room, "Kitchen").
+card(room, "Library").
+card(room, "Lounge").
+card(room, "Study").
 
-weapon("Candlestick").
-weapon("Dagger").
-weapon("Lead Pipe").
-weapon("Revolver").
-weapon("Rope").
-weapon("Wrench").
+card(weapon, "Candlestick").
+card(weapon, "Dagger").
+card(weapon, "Lead Pipe").
+card(weapon, "Revolver").
+card(weapon, "Rope").
+card(weapon, "Wrench").
 
-card(Card):- suspect(Card).
-card(Card):- weapon(Card).
-card(Card):- room(Card).
-
-card_type(Card, suspect) :- suspect(Card).
-card_type(Card, weapon) :- weapon(Card).
-card_type(Card, room) :- room(Card).
-
-all_cards(List) :-
- 	findall(X, card(X), List).
-
-all_cards(List, suspect) :-
-  findall(C, suspect(C), List).
-all_cards(List, weapon) :-
-  findall(C, weapon(C), List).
-all_cards(List, room) :-
-  findall(C, room(C), List).
+all_cards(Type, List) :-
+ 	findall(X, card(Type, X), List).
 
 player(Player) :-
   player_count(NumberOfPlayers),
@@ -62,7 +47,7 @@ player(Player) :-
   between(0, LastPlayer, Player).
 
 dealt_card_count(CardCount) :-
-	all_cards(AllCards),
+	all_cards(_, AllCards),
   length(AllCards, TotalCardCount),
   CardCount is TotalCardCount - 3. % subtract cards in envelope
 
@@ -140,7 +125,7 @@ hand(View, true, Player, Card) :-
   player(View),
   player_card_count(Player, PlayerCardCount),
   length(HandCards, PlayerCardCount),
-  all_cards(AllCards),
+  all_cards(_, AllCards),
   partition(hand(View, false, Player), AllCards, _, HandCards),
   member(Card, HandCards).
 % A card is not in a players hand if it's already in another players hand.
@@ -176,7 +161,7 @@ hand(View, false, Player, Card) :-
   player(View),
   player_card_count(Player, PlayerCardCount),
   length(HandCards, PlayerCardCount),
-  all_cards(AllCards),
+  all_cards(_, AllCards),
   partition(hand(View, true, Player), AllCards, HandCards, OtherCards),
   member(Card, OtherCards).
 % Players want to learn something about cards they don't have by making
@@ -196,39 +181,39 @@ hand(_, false, Player, Card) :-
 % If we know that a card is in a players hand we consider it determined.
 card_determined(View, Card) :-
   player(View),
-  card(Card),
+  card(_, Card),
   player(Player),
   hand(View, true, Player, Card).
 % If we know, say the murder weapon, all other weapons are determined.
 % We may not know who has which weapon but we don't care about that
 % information anymore.
 card_determined(View, Card) :-
-  card_type(Card, Type),
-  card_type(EnvCard, Type),
+  card(Type, Card),
+  card(Type, EnvCard),
   envelope(View, EnvCard).
 
 
 hand_include(View, Player, Card) :-
-  card(Card),
+  card(_, Card),
   player(Player),
   not(hand(View, false, Player, Card)).
 
 
 envelope(View, Card) :-
   player(View),
-	card(Card),
+	card(_, Card),
   forall(player(Player), hand(View, false, Player, Card)).
 envelope(View, Card) :-
   player(View),
-  all_cards(All, _),
+  all_cards(_, All),
   select(Card, All, AllExceptOne),
   forall(member(C, AllExceptOne), hand(View, true, _, C)).
 
 envelope(View, Suspect, Weapon, Room) :-
   player(View),
-  suspect(Suspect),
-  weapon(Weapon),
-  room(Room),
+  card(suspect, Suspect),
+  card(weapon, Weapon),
+  card(room, Room),
   envelope(View, Suspect),
   envelope(View, Weapon),
   envelope(View, Room).
@@ -241,7 +226,7 @@ suggest_card(Card) :-
   player_count(NumberOfPlayers),
   Max is NumberOfPlayers - 1,
   between(1, Max, PlayerIncludeCount),
-  card(Card),
+  card(_, Card),
   not(card_determined(View, Card)),
   findall(Player, hand_include(View, Player, Card), Players),
   length(Players, PlayerIncludeCount).
@@ -279,9 +264,9 @@ next_move(suggestion(Suspect, Weapon, Room)) :-
   suggest_card(Suspect),
   suggest_card(Weapon),
   suggest_card(Room),
-  suspect(Suspect),
-  weapon(Weapon),
-  room(Room). % room last!
+  card(suspect, Suspect),
+  card(weapon, Weapon),
+  card(room, Room). % room last!
 
 
 % note_sheet_cell(Card, Player, "Y") :-
@@ -308,6 +293,5 @@ next_move(suggestion(Suspect, Weapon, Room)) :-
 %     note_sheet(Cards, Rows).
 
 % note_sheet(Rows) :-
-%     all_cards(Cards),
+%     all_cards(_, Cards),
 %     note_sheet(Cards, Rows).
-
