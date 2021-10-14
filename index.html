@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>SWI-Prolog WebAssembly demo</title>
+        <title>Prolog Clue/Cluedo</title>
         <style>
             body { font-family: sans-serif; }
             .app { display: flex; }
@@ -142,7 +142,7 @@
             // populate the actual Module object.
             var Module = {
                 noInitialRun: true,
-                locateFile: url => `../dist/${url}`,
+                locateFile: url => `dist/${url}`,
                 print: print,
                 printErr: printErr,
                 preRun: [() => FS.init(readStdin)], // sets up stdin
