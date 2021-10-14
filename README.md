@@ -9,7 +9,7 @@
 https://en.wikipedia.org/wiki/Cluedo#Rules
 ### Web Demo [WIP]
 
-https://gruhn.github.com/prolog-cluedo
+https://gruhn.github.io/prolog-cluedo
 ### Run Locally
 
 * start REPL: `docker compose run swipl`
