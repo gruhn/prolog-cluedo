@@ -46,11 +46,15 @@ player(Player) :-
   LastPlayer is NumberOfPlayers - 1,
   between(0, LastPlayer, Player).
 
+% Total number of cards in the players hands excluding the 3
+% solution cards in the envelope.
 dealt_card_count(CardCount) :-
 	all_cards(_, AllCards),
   length(AllCards, TotalCardCount),
-  CardCount is TotalCardCount - 3. % subtract cards in envelope
+  CardCount is TotalCardCount - 3.
 
+% The number of hand cards of a certain player. If the cards
+% can't be dealt evenly, some players have more cards than others.
 player_card_count(Player, PlayerCardCount) :-
 	player(Player),
   player_count(NumberOfPlayers),
@@ -64,6 +68,8 @@ player_card_count(Player, PlayerCardCount) :-
   Player >= NumberOfPlayers - mod(CardCount, NumberOfPlayers),
   PlayerCardCount is div(CardCount, NumberOfPlayers).
 
+% Given a "turn" object, determine who was the player
+% whos turn it was.
 turn(Player, Turn) :-
 	player(Player),
 	player_count(NumberOfPlayers),
