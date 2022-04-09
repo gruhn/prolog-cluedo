@@ -1,4 +1,6 @@
 :- module(cluedo, []).
+:- use_module(library(clpfd)).
+:- use_module(library(reif)).
 
 % TODO:
 % * recommend card to show (prefer cards opponent already knows to minimize information leakage)
@@ -43,15 +45,16 @@ all_cards(Type, List) :-
 
 player(Player) :-
   player_count(NumberOfPlayers),
-  LastPlayer is NumberOfPlayers - 1,
-  between(0, LastPlayer, Player).
+  LastPlayer #= NumberOfPlayers - 1,
+  Player in 0 .. LastPlayer,
+  label([Player]).
 
 % Total number of cards in the players hands excluding the 3
 % solution cards in the envelope.
 dealt_card_count(CardCount) :-
 	all_cards(_, AllCards),
   length(AllCards, TotalCardCount),
-  CardCount is TotalCardCount - 3.
+  CardCount #= TotalCardCount - 3.
 
 % The number of hand cards of a certain player. If the cards
 % can't be dealt evenly, some players have more cards than others.
@@ -59,14 +62,10 @@ player_card_count(Player, PlayerCardCount) :-
 	player(Player),
   player_count(NumberOfPlayers),
   dealt_card_count(CardCount),
-  Player < NumberOfPlayers - mod(CardCount, NumberOfPlayers),
-  PlayerCardCount is div(CardCount, NumberOfPlayers) + 1.
-player_card_count(Player, PlayerCardCount) :-
-	player(Player),
-  player_count(NumberOfPlayers),
-  dealt_card_count(CardCount),
-  Player >= NumberOfPlayers - mod(CardCount, NumberOfPlayers),
-  PlayerCardCount is div(CardCount, NumberOfPlayers).
+  ( Player #< NumberOfPlayers - (CardCount mod NumberOfPlayers) ->
+    PlayerCardCount #= CardCount div NumberOfPlayers + 1 ;
+    PlayerCardCount #= CardCount div NumberOfPlayers
+  ).
 
 % Given a "turn" object, determine who was the player
 % whos turn it was.
@@ -76,7 +75,7 @@ turn(Player, Turn) :-
   player_first(SP),
   turns(Turns),
   nth0(Index, Turns, Turn),
-	mod(Index - Player + SP, NumberOfPlayers) =:= 0.
+	(Index - Player + SP) mod NumberOfPlayers #= 0.
 
 
 % Players are arranged in a cyclic order with respect to clockwise turn order.
@@ -86,15 +85,16 @@ turn(Player, Turn) :-
 %  true:  player1 < player3 < player5
 %  true:  player5 < player1 < player2
 %  false: player1 < player3 < player2
-cyclic_order(A, B, C) :- A < B, B < C.
-cyclic_order(A, B, C) :- B < C, C < A.
-cyclic_order(A, B, C) :- C < A, A < B.
+cyclic_order(A, B, C) :- A #< B, B #< C.
+cyclic_order(A, B, C) :- B #< C, C #< A.
+cyclic_order(A, B, C) :- C #< A, A #< B.
 
 sits_between(PlayerA, PlayerB, PlayerC) :-
   player(PlayerA),
   player(PlayerB),
   player(PlayerC),
   cyclic_order(PlayerA, PlayerB, PlayerC).
+
 
 :- table hand/4.
 
@@ -140,7 +140,7 @@ hand(View, false, PlayerA, Card) :-
   player(PlayerA),
   player(PlayerB),
 	hand(View, true, PlayerB, Card),
-	PlayerA \= PlayerB.
+	dif(PlayerA, PlayerB).
 % If PlayerA made a suggestion which was disproved by PlayerC,
 % then any PlayerB sitting between the two was not able to
 % dispove the suggestion and can therefore not possess any of the named cards
@@ -159,7 +159,7 @@ hand(_, false, PlayerB, Card) :-
 hand(_, false, OtherPlayer, Card) :-
 	player(OtherPlayer),
   turn(Player, (suggestion(Suspect, Weapon, Room), disproof)),
-  Player \= OtherPlayer,
+  dif(Player, OtherPlayer),
   member(Card, [Suspect, Weapon, Room]).
 % If we know all of a players cards all other cards can be excluded. Implies
 % that all cards not in MY hand are automatically excluded.
@@ -230,7 +230,7 @@ envelope(View, Suspect, Weapon, Room) :-
 suggest_card(Card) :-
   i_am_player(View),
   player_count(NumberOfPlayers),
-  Max is NumberOfPlayers - 1,
+  Max #= NumberOfPlayers - 1,
   between(1, Max, PlayerIncludeCount),
   card(_, Card),
   not(card_determined(View, Card)),
@@ -273,31 +273,3 @@ next_move(suggestion(Suspect, Weapon, Room)) :-
   card(suspect, Suspect),
   card(weapon, Weapon),
   card(room, Room). % room last!
-
-
-% note_sheet_cell(Card, Player, "Y") :-
-%   hand(Player, Card).
-% note_sheet_cell(Card, Player, "N") :-
-%   hand_exclude(Player, Card).
-% note_sheet_cell(Card, Player, " ") :-
-%   not(hand(Player, Card)),
-%   not(hand_exclude(Player, Card)).
-
-% note_sheet_row(Card, Cells) :-
-%   player_count(PlayerCount),
-%   note_sheet_row(Card, PlayerCount, Cells).
-
-% note_sheet_row(_, 0, []).
-% note_sheet_row(Card, PlayerBefore, [Cell|Cells]) :-
-%   Player is PlayerBefore - 1,
-%   note_sheet_cell(Card, Player, Cell),
-%   note_sheet_row(Card, Player, Cells).
-
-% note_sheet([], []).
-% note_sheet([Card|Cards], [Row|Rows]) :-
-%     note_sheet_row(Card, 0, Row),
-%     note_sheet(Cards, Rows).
-
-% note_sheet(Rows) :-
-%     all_cards(_, Cards),
-%     note_sheet(Cards, Rows).
