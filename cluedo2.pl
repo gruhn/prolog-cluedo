@@ -1,138 +1,252 @@
 :- use_module(library(clpz)).
-:- use_module(library(lists), [same_length/2]).
-:- use_module(library(pairs), [pairs_keys_values/3]).
+:- use_module(library(lists)).
+:- use_module(library(pairs), [pairs_keys/2, pairs_keys_values/3]).
 
-:- use_module(library(dcgs), [phrase/2]).
-:- use_module(library(reif), [tmember/2]).
+:- use_module(library(dcgs)).
+:- use_module(library(reif)).
 :- use_module(library(between), [numlist/3]).
 
 :- use_module(library(debug)).
+:- use_module(library(tabling)).
 :- use_module(library(format), [portray_clause/1]).
 
-suspects(["Mustard", "Scarlett", "Peacock", "Plum", "Orchid", "Green"]).
+:- dynamic(suspect/1).
+:- dynamic(weapon/1).
+:- dynamic(room/1).
 
-weapons(["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"]).
+suspect("Mustard").
+suspect("Scarlett").
+suspect("Peacock").
+suspect("Plum").
+suspect("Orchid").
+suspect("Green").
 
-rooms(["Ballroom", "Billiard Room", "Conservatory", "Dining Room", "Hall", "Kitchen", "Library", "Lounge", "Study"]).
+weapon("Candlestick").
+weapon("Dagger").
+weapon("Lead Pipe").
+weapon("Revolver").
+weapon("Rope").
+weapon("Wrench").
 
-cards(Pairs) :-
-  suspects(S), weapons(W), rooms(R),
-  append([S,W,R], Cards),
-  length(Cards, Count),
-  N #= Count - 1,
-  numlist(0, N, Indices),
-  pairs_keys_values(Pairs, Indices, Cards).
+room("Ballroom").
+room("Billiard Room").
+room("Conservatory").
+room("Dining Room").
+room("Hall").
+room("Kitchen").
+room("Library").
+room("Lounge").
+room("Study").
+
+% -----------------------------------------
+
+suspects(Ss) :-
+  setof(S, suspect(S), Ss).
+
+weapons(Ws) :-
+  setof(W, weapon(W), Ws).
+
+rooms(Rs) :-
+  setof(R, room(R), Rs).
+
+cards(Cs) :-
+  suspects(Ss),
+  weapons(Ws),
+  rooms(Rs),
+  append([Ss, Ws, Rs], Cs).
 
 card_count(Count) :-
-  cards(Ps), length(Ps, Count).
+  cards(Cs),
+  length(Cs, Count).
 
-cardinality(Car, Vars) :-
-  Vars ins 0 .. 1,
-  sum(Vars, #=, Car).
+card_type(Card, suspect) :- suspect(Card).
+card_type(Card, weapon) :- weapon(Card).
+card_type(Card, room) :- room(Card).
 
-note_sheet(PlayerCount, Rows) :-
-  suspects(Suspects),
-  weapons(Weapons),
-  rooms(Rooms),
+% card_type_count(Type, Count) :-
+%   Template =.. [Type, Card],
+%   findall(Card, Template, Cards),
+%   length
 
-  same_length(Suspects, SuspectRows),
-  same_length(Weapons, WeaponRows),
-  same_length(Rooms, RoomRows),
+card_id(Card, ID) :-
+  var(Card),
+  suspect_id(Card, SID),
+  weapon_id(Card, WID),
+  room_id(Card, RID),
+  domains_union([SID,RID,WID], Dom),
+  ID in Dom.
+card_id(Card, ID) :-
+  ground(Card),
+  suspect_id(Card, ID).
+card_id(Card, ID) :-
+  ground(Card),
+  weapon_id(Card, ID).
+card_id(Card, ID) :-
+  ground(Card),
+  room_id(Card, ID).
 
-  append([ SuspectRows, WeaponRows, RoomRows ], Rows),
+suspect_id(Card, ID) :-
+  suspects(Cards),
+  length(Cards, Count),
+  Index in 1 .. Count,
+  ID #= Index * 3 - 2,
+  ( ground(Card) -> nth1(Index, Cards, Card) ; true ).
 
-  RowLength #= PlayerCount + 1,
-  length(Row, RowLength),
-  maplist(same_length(Row), Rows),
-  maplist(cardinality(1), Rows),
+weapon_id(Card, ID) :-
+  weapons(Cards),
+  length(Cards, Count),
+  Index in 1 .. Count,
+  ID #= Index * 3 - 1,
+  ( ground(Card) -> nth1(Index, Cards, Card) ; true ).
 
-  transpose(Rows, Cols),
-  Cols = [ EnvCol | PlayerCols ],
-  envelope_column(EnvCol),
-  player_columns(PlayerCols).
+room_id(Card, ID) :-
+  rooms(Cards),
+  length(Cards, Count),
+  Index in 1 .. Count,
+  ID #= Index * 3,
+  ( ground(Card) -> nth1(Index, Cards, Card) ; true ).
 
-note_sheet_column(Col) :-
-  card_count(CardCount),
-  length(Col, CardCount).
+player_card_count(PlayerCount, Player, CardCount) :-
+  card_count(TotalCards),
+  % total cards -3 cards in the envelope
+  HandCards #= TotalCards - 3,
+  % If cards can't be distributed evenly among players,
+  % the excess cards are given to the first players in order.
+  ExtraCard #<==> Player #=< (HandCards mod PlayerCount),
+  CardCount #= (HandCards div PlayerCount) + ExtraCard.
 
-envelope_column(Col) :-
-  note_sheet_column(Col),
-  suspects(Suspects),
-  weapons(Weapons),
-  rooms(Rooms),
-  same_length(Suspects, EnvSuspects),
-  same_length(Weapons, EnvWeapons),
-  same_length(Rooms, EnvRooms),
-  append([ EnvSuspects, EnvWeapons, EnvRooms ], Col),
-  cardinality(1, EnvSuspects),
-  cardinality(1, EnvWeapons),
-  cardinality(1, EnvRooms).
+deck_card(Deck, Card) :-
+  card_id(Card, ID),
+  tmember(#=(ID), Deck).
 
-player_columns(Cols) :-
-  maplist(note_sheet_column, Cols),
-  length(Cols, PlayerCount),
+% ---------------------------------------------------------------
 
-  card_count(CardCount),
-  LastPlayerCardCount #= (CardCount-3) div PlayerCount,
-  FirstPlayerCardCount #= LastPlayerCardCount + 1,
-  ExcessCards #= (CardCount-3) mod PlayerCount,
+initial_game_state(PlayerCount, FirstPlayer, IAmPlayer, OwnDeck0, State0) :-
+  Turns = [],
 
-  length(FirstPlayerCols, ExcessCards),
-  append(FirstPlayerCols, LastPlayerCols, Cols),
-  maplist(cardinality(FirstPlayerCardCount), FirstPlayerCols),
-  maplist(cardinality(LastPlayerCardCount), LastPlayerCols).
+  numlist(1, PlayerCount, Players),
 
+  % for each player, describe a deck of hand cards
+  same_length(Players, PlayerDecks),
+  maplist(player_card_count(PlayerCount), Players, PlayerCardCounts),
+  maplist(length, PlayerDecks, PlayerCardCounts),
 
-matrix_cell(Rows, X, Y, Val) :-
-  nth0(Y, Rows, Row),
-  nth0(X, Row, Val).
-
-matrix_cells(_, [], _) --> [].
-matrix_cells(_, _, []) --> [].
-matrix_cells(Rows, [X|Xs], Ys) -->
-  { maplist(matrix_cell(Rows, X), Ys, Vals1) },
-  Vals1,
-  matrix_cells(Rows, Xs, Ys).
-
-game_player_count((_, _, N, _), N).
-game_player_me((_, P, _, _), P).
-game_player_first((_, _, _, P), P).
-game_note_sheet((S,_,_,_),S).
-
-player(Game, Player) :-
-  game_player_count(Game, PlayerCount),
-  Player in 0 .. PlayerCount.
-
-players_hold_cards(Game, Players, Vars, Cards) :-
-  game_note_sheet(Game, Sheet),
-
-  % enforce iterative deepening
-  VarsLen #= CardsLen * PlayersLen,
-  length(Vars, VarsLen),
-  length(Players, PlayersLen),
-  length(Cards, CardsLen),
-
-  maplist(player(Game), Players),
-  maplist(card_index, Cards, CardIndices),
+  % my own cards are defined from the beginning
+  maplist(card_id, OwnDeck0, OwnDeck1),
+  sort(OwnDeck1, OwnDeck),
+  nth1(IAmPlayer, PlayerDecks, OwnDeck),
 
   % break symmetry / prune duplicates (because [1] ~ [1,1], [2,1] ~ [1,2], ...)
-  chain(#<, Players),
-  chain(#<, CardIndices),
+  maplist(chain(#<), PlayerDecks),
 
-  phrase(matrix_cells(Sheet, Players, CardIndices), Vars).
+  Envelope = [ EnvSuspect, EnvWeapon, EnvRoom ],
+  suspect_id(_, EnvSuspect),
+  weapon_id(_, EnvWeapon),
+  room_id(_, EnvRoom),
+
+  card_count(CardCount),
+  append(PlayerDecks, AllPlayerCards),
+  append(Envelope, AllPlayerCards, AllCards),
+  AllCards ins 1 .. CardCount,
+  all_distinct(AllCards),
+
+  State0 = s(PlayerCount, IAmPlayer, FirstPlayer, PlayerDecks, Envelope, Turns).
+
+game_state(State), [State] --> [State].
+
+player_count(PlayerCount) -->
+  game_state(s(PlayerCount, _, _, _, _, _)).
+
+i_am_player(IAmPlayer) -->
+  game_state(s(_, IAmPlayer, _, _, _, _)).
+
+first_player(FirstPlayer) -->
+  game_state(s(_, _, FirstPlayer, _, _, _)).
+
+player_decks(Decks) -->
+  game_state(s(_, _, _, Decks, _, _)).
+
+player_deck(Player, Deck) -->
+  player_decks(Decks),
+  { nth1(Player, Decks, Deck) }.
+
+envelope(Env) -->
+  game_state(s(_, _, _, _, Env, _)).
+
+new_turn(NewTurn0), [s(PlayerCount, IAmPlayer, FirstPlayer, PlayerDecks, Envelope, Turns)] -->
+  [ s(PlayerCount, IAmPlayer, FirstPlayer, PlayerDecks, Envelope, Turns0) ],
+  {
+    NewTurn0 = turn(Suspect, Weapon, Room, DisproofPlayer, Disproof),
+    suspect_id(Suspect, SuspectID),
+    weapon_id(Weapon, WeaponID),
+    room_id(Room, RoomID),
+    card_id(Disproof, DisproofID),
+
+    NewTurn = turn(SuspectID, WeaponID, RoomID, DisproofPlayer, DisproofID),
+    phrase((seq(Turns0),seq([NewTurn])), Turns),
+    domains_union([SuspectID, WeaponID, RoomID], SuggestionDomain),
+    DisproofID in SuggestionDomain,
+
+    % The player who used posesses a card, if it's used to disproof a suggestion.
+    nth1(DisproofPlayer, PlayerDecks, Deck),
+    % write(SuggestionDomain), nl,
+    write(DisproofID), nl,
+    tmember(#=(DisproofID), Deck)
+
+    % domains_union(Deck, DeckDomain),
+    % DisproofID in SuggestionDomain /\ DeckDomain,
+    % DisproofID in DeckDomain,
+  }.
+
+new_turns([]), [State] --> [State].
+new_turns([T|Ts])      --> new_turn(T), new_turns(Ts).
+
+player(P) -->
+  player_count(PlayerCount),
+  { P in 1 .. PlayerCount }.
+
+% player_play_turn(Player, Turn) -->
+%   player(Player),
+%   player_count(PlayerCount),
+%   first_player(FirstPlayer),
+%   turns(Turns),
+%   {
+%     length(Turns, TurnCount),
+%     TurnNumber in 1 .. TurnCount,
+%     (TurnNumber - Player + FirstPlayer) mod PlayerCount #= 0,
+%     nth1(TurnNumber, Turns, Turn)
+%   }.
+
+% ---------------------------------------
+
+wrap(Functor, Arg1, Arg2, Term) :-
+  Term =.. [Functor, Arg1, Arg2].
+
+domains_union([X|Xs], Domain) :-
+  maplist(fd_dom, [X|Xs], [D|Ds]),
+  foldl(wrap(\/), Ds, D, Domain).
+
+% current_player(Player) -->
+%   player(Player),
+%   player_count(PlayerCount),
+%   first_player(FirstPlayer),
+%   turns(Turns),
+
+%   { TurnIndex #>= 0,
+%     0 #= (TurnIndex - Player + FirstPlayer) mod PlayerCount.
+%   }.
+
+% player_disproof(Player, suggestion(S,W,R)) -->
+%   turns(Turns),
+%   { tmember(=(turn(S,W,R,Player,Disproof)), Turns) }.
+
+% ----------------------------------------
 
 sit_between(PlayerCount, P0, P1, Ps) :-
   numlist(1, PlayerCount, Ps0),
   append(PreP0, [P0|PostP0], Ps0),
   append(PostP0, PreP0, Ps1),
   append(Ps, [P1|_], Ps1).
-
-current_player(Game, TurnIndex, Player) :-
-  game_player_count(Game, PlayerCount),
-  game_player_first(Game, FirstPlayer),
-  TurnIndex #>= 0,
-  Player in 1 .. PlayerCount,
-  (TurnIndex - Player + FirstPlayer) mod PlayerCount #= 0.
 
 turn_constraint(Game, Index-turn(S,W,R,P1,C)) :-
   current_player(Game, Index, P0),
@@ -160,81 +274,74 @@ turn_constraint(Game, Index-turn(S,W,R,P1,C)) :-
 % turn_constraint(Sheet, _, _-turn(S,W,R)) :-
   % suggestion that nobody could disproof
 
-card_index(Card, Index) :-
-  cards(Pairs),
-  length(Pairs, CardCount),
-  Index in 0 .. CardCount,
-  tmember(=(Index-Card), Pairs).
 
 % turn_encoded(Game, turn(S0,W0,R0,P,C0), turn(S,W,R,P,C)) :-
 %   player(Game, P),
 %   maplist(card_index, [S0,W0,R0,C0],[S,W,R,C]),
 %   element(_,[S,W,R],C).
 
-game1(Game) :-
-  IAmPlayer = 1,
+% show_note_sheet :-
+%   note_sheet(Sheet), clues,
+%   % pairs_keys_values(Sheet, _, Rows),
+%   % * length(Rows1, 19),
+%   % * append(Rows1, _, Rows),
+%   % * append(Rows1, Vars),
+%   % * labeling([], Vars),
+%   maplist(portray_clause, Sheet).
+
+% players_hold_cards_(Ps, Vs, Cs) :-
+%   game1(Game), !,
+%   players_hold_cards(Game, Ps, Vs, Cs).
+
+%%% TESTs %%%
+
+% test(sit_between) :-
+%   sit_between(5, 1, 2, []),
+%   sit_between(5, 1, 5, [2,3,4]),
+%   sit_between(5, 3, 2, [4,5,1]).
+
+% --------------------------------------------------------
+
+example_game(State) :-
   PlayerCount = 4,
-  PlayerFirst = 4,
-  Game = (Sheet, IAmPlayer, PlayerCount, PlayerFirst),
-
-  note_sheet(PlayerCount, Sheet),
-
-  OwnCards = ["Orchid", "Dagger", "Wrench", "Dining Room", "Library"],
-  same_length(OwnCards, OwnCardsVars),
-  maplist(#=(1), OwnCardsVars),
-  players_hold_cards(Game, [IAmPlayer], OwnCardsVars, OwnCards),
-
+  IAmPlayer = 1,
+  FirstPlayer = 4,
+  OwnCards =["Orchid", "Dagger", "Wrench", "Dining Room", "Library"],
   Turns =
     [ turn("Green", "Dagger", "Library", 1, "Dagger")
     , turn("Mustard", "Candlestick", "Ballroom", 2, "Mustard")
     , turn("Orchid", "Revolver", "Kitchen", 1, "Orchid")
     , turn("Orchid", "Wrench", "Study", 4, _)
 
-    , turn("Orchid", "Wrench", "Hall", 1, "Wrench")
-    , turn("Scarlett", "Revolver", "Kitchen", 2, "Revolver")
-    , turn("Green", "Lead Pipe", "Ballroom", 3, _)
-    , turn("Orchid", "Revolver", "Kitchen", 1, "Orchid")
+    % , turn("Orchid", "Wrench", "Hall", 1, "Wrench")
+    % , turn("Scarlett", "Revolver", "Kitchen", 2, "Revolver")
+    % , turn("Green", "Lead Pipe", "Ballroom", 3, _)
+    % , turn("Orchid", "Revolver", "Kitchen", 1, "Orchid")
 
-    , turn("Orchid", "Revolver", "Dining Room", 1, "Dining Room")
-    , turn("Scarlett", "Candlestick", "Ballroom", 2, "Scarlett")
-    , turn("Orchid", "Rope", "Library", 3, _)
-    , turn("Orchid", "Wrench", "Kitchen", 1, "Wrench")
+    % , turn("Orchid", "Revolver", "Dining Room", 1, "Dining Room")
+    % , turn("Scarlett", "Candlestick", "Ballroom", 2, "Scarlett")
+    % , turn("Orchid", "Rope", "Library", 3, _)
+    % , turn("Orchid", "Wrench", "Kitchen", 1, "Wrench")
 
-    , turn("Orchid", "Rope", "Billiard Room", 1, "Orchid")
-    , turn("Scarlett", "Candlestick", "Kitchen", 2, "Candlestick")
-    , turn("Plum", "Wrench", "Lounge", 4, _)
-    , turn("Orchid", "Revolver", "Lounge", 4, _)
+    % , turn("Orchid", "Rope", "Billiard Room", 1, "Orchid")
+    % , turn("Scarlett", "Candlestick", "Kitchen", 2, "Candlestick")
+    % , turn("Plum", "Wrench", "Lounge", 4, _)
+    % , turn("Orchid", "Revolver", "Lounge", 4, _)
 
-    , turn("Orchid", "Rope", "Ballroom", 1, "Orchid")
-    , turn("Plum", "Lead Pipe", "Kitchen", 4, "Plum")
-    , turn("Peacock", "Wrench", "Conservatory", 3, _)
-    , turn("Plum", "Revolver", "Dining Room", 4, _)
+    % , turn("Orchid", "Rope", "Ballroom", 1, "Orchid")
+    % , turn("Plum", "Lead Pipe", "Kitchen", 4, "Plum")
+    % , turn("Peacock", "Wrench", "Conservatory", 3, _)
+    % , turn("Plum", "Revolver", "Dining Room", 4, _)
 
-    , turn("Orchid", "Revolver", "Billiard Room", 1, "Orchid")
+    % , turn("Orchid", "Revolver", "Billiard Room", 1, "Orchid")
     % , turn("Peacock", "Lead Pipe", "Kitchen")
 
     % player 1 wins
     ],
 
-  length(Turns, TurnCount),
-  LastTurn #= TurnCount - 1,
-  numlist(0, LastTurn, TurnIndices),
-  pairs_keys_values(TurnsWithIndex, TurnIndices, Turns),
+  initial_game_state(PlayerCount, FirstPlayer, IAmPlayer, OwnCards, State0),
+  phrase(new_turns(Turns), [State0], [State]).
 
-  maplist(turn_constraint(Game), TurnsWithIndex).
-
-show(Rows) :-
-  append(Rows, Vars),
-  labeling([], Vars),
-  maplist(portray_clause, Rows).
-
-players_hold_cards_(Ps, Vs, Cs) :-
-  game1(Game), !,
-  players_hold_cards(Game, Ps, Vs, Cs).
-
-%%% TESTs %%%
-
-test(sit_between) :-
-  sit_between(5, 1, 2, []),
-  sit_between(5, 1, 5, [2,3,4]),
-  sit_between(5, 3, 2, [4,5,1]).
+cluedo(Goal) :-
+  example_game(State0),
+  phrase(Goal, [State0], _).
